@@ -131,10 +131,10 @@ df_main = pd.concat([audio_tab, split_df], axis = 1)
 #%%
 #Imputing NaN's:
 for i in range(0, 1440):
-    df_main.iloc[i,4:] = df_main.iloc[i,4:].fillna(df_main.iloc[i,4:].mean())
+    df_main.iloc[i,4:] = df_main.iloc[i,4:].fillna(df_main.iloc[i,4:].median())
 # %%
 #splitting into training and testing:
-train_data, test_data = train_test_split(df_main, test_size=0.05, random_state=0)
+train_data, test_data = train_test_split(df_main, test_size=0.15, random_state=0)
 #%%
 X_train = train_data.iloc[:, 4:]
 y_train = train_data.loc[:,'emotion'] #train target label
@@ -183,6 +183,8 @@ model.add(Dense(8, activation='softmax')) # output layer
 model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=tf.keras.optimizers.SGD(learning_rate=0.0001))
 model.summary()
 '''
+#Baseline CNN model: 
+
 model=Sequential()
 ###first layer
 model.add(Dense(100,input_shape=(259,)))
