@@ -166,7 +166,7 @@ X_train = torch.tensor(np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 
 #%%
 y_train = y_train.reshape(-1, 8)
 y_train = torch.tensor(y_train, dtype=torch.float)
-#%%
+
 #%%
 # Define the training parameters
 input_size = X_train.shape[2]

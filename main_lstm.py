@@ -172,94 +172,62 @@ y_train = torch.tensor(y_train, dtype=torch.float)
 # %%
 # Define the training parameters
 input_size = X_train.shape[2]
-hidden_size = 10
+hidden_size = 50
 output_size = y_train.shape[1]
 learning_rate = 0.01
-max_epochs = 30
-
-
-# Define the RNN model
-class RNN(nn.Module):
+max_epochs = 25
+#%%
+# Define the LSTM model
+class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
-        super(RNN, self).__init__()
+        super(LSTM, self).__init__()
         self.hidden_size = hidden_size
-        self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
-        self.h2o = nn.Linear(hidden_size, output_size)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=4, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input, hidden):
-        combined = torch.cat((input, hidden), 1)
-        hidden = self.i2h(combined)
-        output = self.h2o(hidden)
-        output = self.sigmoid(output)
-        return output, hidden
-
-    def initHidden(self):
-        return torch.zeros(1, self.hidden_size)
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = self.fc(out[:, -1, :])
+        out = self.sigmoid(out)
+        return out
 
 
 # Convert the input and target arrays to PyTorch tensors
 X_train = torch.tensor(X_train, dtype=torch.float)
 y_train = torch.tensor(y_train, dtype=torch.float)
 
-# Initialize the RNN model and the optimizer
-rnn = RNN(input_size, hidden_size, output_size)
+# Initialize the LSTM model and the optimizer
+lstm = LSTM(input_size, hidden_size, output_size)
 criterion = nn.BCELoss()
-optimizer = torch.optim.SGD(rnn.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(lstm.parameters(), lr=learning_rate)
 
 # %%
-# Train the RNN model
-for epoch in range(1, max_epochs + 1):
-    loss = 0
-    for i in range(X_train.size(0)):
-        hidden = rnn.initHidden()
+# Train the LSTM model
+for epoch in range(max_epochs):
+    optimizer.zero_grad()
+    y_pred = lstm(X_train)
+    loss = criterion(y_pred, y_train)
+    loss.backward()
+    optimizer.step()
+    if epoch % 5 == 0:
+        print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, max_epochs, loss.item()))
 
-        optimizer.zero_grad()
-
-        # Pass the entire sequence through the RNN
-        for j in range(X_train.size(1)):
-            output, hidden = rnn(X_train[i][j].unsqueeze(0), hidden)
-
-        # Compute loss on the final output only
-        err = criterion(output[-1], y_train[i])
-        loss += err.item()
-        err.backward()
-        optimizer.step()
-
-    print(f"Epoch {epoch} loss: {loss / X_train.size(0)}")
 
 # Epoch 30 loss: 0.355356015751954
 
-# %%
+ # %%
 # Convert the validation set to PyTorch tensors
 X_test = torch.tensor(X_test, dtype=torch.float)
 y_test = torch.tensor(y_test, dtype=torch.float)
 
 # Set the model to evaluation`` mode
-rnn.eval()
+with torch.no_grad():
+    lstm.eval()
+    y_pred = lstm(X_test)
+    loss = criterion(y_pred, y_test)
+    predicted_labels = y_pred.round()
+    accuracy = (predicted_labels == y_test).sum().item() / y_test.size(0)
+    print('Validation/Test Loss: {:.4f}, Accuracy: {:.4f}'.format(loss.item(), accuracy))
 
-# Initialize variables for accuracy calculation
-# Initialize variables for accuracy calculation
-correct = 0
-total = 0
-
-# Iterate over the validation set
-for i in range(X_test.shape[0]):
-    hidden = rnn.initHidden()
-
-    # Pass the entire sequence through the RNN
-    for j in range(X_test.shape[1]):
-        output, hidden = rnn(X_test[i][j].unsqueeze(0), hidden)
-
-    # Get the predicted label
-    pred = (output[-1] >= 0.5)
-
-    # Update the variables for accuracy calculation
-    total += 1
-    correct += torch.all(torch.eq(pred, y_test[i]))
-
-# Calculate the accuracy
-accuracy = correct / total
-print(f"Validation set accuracy: {accuracy}")
 # %%
-# Validation set accuracy: 0.018518518656492233
