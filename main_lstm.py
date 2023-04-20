@@ -130,7 +130,7 @@ for i in range(0, 1440):
     df_main.iloc[i, 4:] = df_main.iloc[i, 4:].fillna(df_main.iloc[i, 4:].median())
 # %%
 # splitting into training and testing:
-train_data, test_data = train_test_split(df_main, test_size=0.15, random_state=0)
+train_data, test_data = train_test_split(df_main, test_size=0.25, random_state=0)
 # %%
 X_train = train_data.iloc[:, 4:]
 y_train = train_data.loc[:, 'emotion']  # train target label
@@ -168,14 +168,14 @@ X_train = torch.tensor(np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 
 # %%
 y_train = y_train.reshape(-1, 8)
 y_train = torch.tensor(y_train, dtype=torch.float)
-# %%
+
 # %%
 # Define the training parameters
 input_size = X_train.shape[2]
-hidden_size = 50
+hidden_size = 10
 output_size = y_train.shape[1]
 learning_rate = 0.01
-max_epochs = 25
+max_epochs = 40
 #%%
 # Define the LSTM model
 class LSTM(nn.Module):
@@ -199,7 +199,7 @@ y_train = torch.tensor(y_train, dtype=torch.float)
 
 # Initialize the LSTM model and the optimizer
 lstm = LSTM(input_size, hidden_size, output_size)
-criterion = nn.BCELoss()
+criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(lstm.parameters(), lr=learning_rate)
 
 # %%
