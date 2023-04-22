@@ -16,7 +16,6 @@ from sklearn.preprocessing import LabelEncoder
 from keras.models import Sequential 
 from keras.regularizers import l2
 from keras.layers import  Input, Flatten, Dropout, Activation, BatchNormalization, Dense
-from keras.optimizer_experimental import sgd
 from tensorflow.keras.utils import to_categorical
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 import tensorflow as tf
@@ -145,7 +144,7 @@ X_test = X_test.reshape(216, 14, 14, 1)
 # %%
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, SGD
 import tensorflow as tf
 #%%
 # Define the 2D CNN architecture
@@ -168,7 +167,7 @@ model.add(Dropout(0.5))
 model.add(Dense(8, activation='softmax'))
 #%%
 # Compile the model with an appropriate optimizer, loss function and metrics
-model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=Adam(learning_rate=0.0001))
+model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=SGD(learning_rate=0.0001))
 # %%
 checkpoint = ModelCheckpoint("best_initial_model.hdf5", monitor='val_accuracy', verbose = 1, save_best_only = True, mode='max')
 
