@@ -87,7 +87,7 @@ for i in glob.glob(f'{rootdir}/*/**'):
 num = []
 sr_lst = []
 for i in range(len(main_path)):
-    X, sample_rate = librosa.load(main_path[i],duration=3,sr=16000)
+    X, sample_rate = librosa.load(main_path[i],duration=3,sr=38500)
     num.append(X)
     sr_lst.append(sample_rate)
     #get the mel-scaled spectrogram (ransform both the y-axis (frequency) to log scale, and the “color” axis (amplitude) to Decibels, which is kinda the log scale of amplitudes.)
@@ -105,7 +105,7 @@ df_main = pd.concat([audio_tab, df], axis = 1)
 
 #%%
 split_df = pd.DataFrame(df_main['mel_spectrogram'].tolist())
-split_df = split_df.iloc[:,:81]
+split_df = split_df.iloc[:,:196]
 
 #%%
 df_main = pd.concat([audio_tab, split_df], axis = 1)
@@ -139,10 +139,9 @@ lb = LabelEncoder()
 y_train = to_categorical(lb.fit_transform(y_train))
 y_test = to_categorical(lb.fit_transform(y_test))
 # %%
-X_train = X_train.reshape(1224, 9, 9, 1)
-X_test = X_test.reshape(216, 9, 9, 1)
+X_train = X_train.reshape(1224, 14, 14, 1)
+X_test = X_test.reshape(216, 14, 14, 1)
 
-#%%
 # %%
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization
@@ -151,7 +150,7 @@ import tensorflow as tf
 #%%
 # Define the 2D CNN architecture
 model = Sequential()
-model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(9, 9, 1)))
+model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(14, 14, 1)))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 model.add(BatchNormalization())
 
@@ -168,15 +167,12 @@ model.add(Dense(128, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(8, activation='softmax'))
 #%%
-#X_train = np.reshape(X_train, ( 1224,X_train.shape[1], 91, 1))
-#X_test = np.reshape(X_test, (X_test.shape[0], 1224, 209, 1))
-#%%
 # Compile the model with an appropriate optimizer, loss function and metrics
 model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=Adam(learning_rate=0.0001))
 # %%
 checkpoint = ModelCheckpoint("best_initial_model.hdf5", monitor='val_accuracy', verbose = 1, save_best_only = True, mode='max')
 
-model_history = model.fit(X_train, y_train, batch_size=32, epochs=100, validation_data = (X_test, y_test), callbacks = [checkpoint])
+model_history = model.fit(X_train, y_train, batch_size=64, epochs=100, validation_data = (X_test, y_test), callbacks = [checkpoint])
 
 # %%
 model.evaluate(X_test, y_test)
