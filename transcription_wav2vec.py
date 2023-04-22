@@ -9,7 +9,7 @@ model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-large-960h-lv60-self")
 tokenizer = Wav2Vec2Tokenizer.from_pretrained("facebook/wav2vec2-large-960h-lv60-self")
 # %%
 # Load audio waveform
-waveform, sample_rate = torchaudio.load("ravdess/Actor_01/03-01-01-01-02-01-01.wav")
+waveform, sample_rate = torchaudio.load("ravdess/Actor_01/03-01-01-01-01-01-01.wav")
 
 #%%
 # Resample audio to 16kHz

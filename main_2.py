@@ -16,7 +16,6 @@ from sklearn.preprocessing import LabelEncoder
 from keras.models import Sequential 
 from keras.regularizers import l2
 from keras.layers import  Input, Flatten, Dropout, Activation, BatchNormalization, Dense
-from keras.layers import Conv1D, MaxPooling1D, AveragePooling1D
 from keras.optimizer_experimental import sgd
 from tensorflow.keras.utils import to_categorical
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -39,7 +38,6 @@ Repetition (01 = 1st repetition, 02 = 2nd repetition).
 
 Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
-
 # %%
 emotion = []
 gender = []
@@ -89,37 +87,25 @@ for i in glob.glob(f'{rootdir}/*/**'):
 num = []
 sr_lst = []
 for i in range(len(main_path)):
-    y, sr = librosa.load(main_path[i],duration=3,sr=16000)
-    num.append(y)
-    sr_lst.append(sr)
+    X, sample_rate = librosa.load(main_path[i],duration=3,sr=16000)
+    num.append(X)
+    sr_lst.append(sample_rate)
     #get the mel-scaled spectrogram (ransform both the y-axis (frequency) to log scale, and the “color” axis (amplitude) to Decibels, which is kinda the log scale of amplitudes.)
 #%%
-spectrogram = []
+log_spectrogram = []
 for i in range(len(num)):
     spec = librosa.feature.melspectrogram(y=num[i], sr=sr_lst[i], n_mels=128,fmax=8000) 
-    db_spec = librosa.power_to_db(spec, ref = np.max)
+    db_spec = librosa.power_to_db(spec)
     #temporally average spectrogram
-    spectrogram.append(np.mean(db_spec, axis = 0))
+    log_spectrogram.append(np.mean(db_spec, axis = 0))
         
-df['mel_spectrogram'] = spectrogram
-#%%
+df['mel_spectrogram'] = log_spectrogram
+
 df_main = pd.concat([audio_tab, df], axis = 1)
-
-
-#%%
-#for i in range(len(df_main['mel_spectrogram'])):
-#    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].astype(np.#float32)
-#%%
-#for i in range(len(df_main['mel_spectrogram'])):
-#    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].flatten()
-
-#%%
-#for i in range(len(df_main['mel_spectrogram'])):
-#    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].tolist()
 
 #%%
 split_df = pd.DataFrame(df_main['mel_spectrogram'].tolist())
-split_df = split_df.iloc[:,:209]
+split_df = split_df.iloc[:,:81]
 
 #%%
 df_main = pd.concat([audio_tab, split_df], axis = 1)
@@ -132,6 +118,13 @@ y_train = train_data.loc[:,'emotion'] #train target label
 
 X_test = test_data.iloc[:, 4:]
 y_test = test_data.loc[:, 'emotion'] #test target label
+
+#%%
+#Normalizing the data 
+mean = np.mean(X_train, axis=0)
+std = np.std(X_train, axis=0)
+X_train = (X_train - mean)/std
+X_test = (X_test - mean)/std
 
 # %%
 #converting into np array:
@@ -146,51 +139,10 @@ lb = LabelEncoder()
 y_train = to_categorical(lb.fit_transform(y_train))
 y_test = to_categorical(lb.fit_transform(y_test))
 # %%
-#Reshape data to include 3D tensor
-X_train = X_train[:,:,np.newaxis]
-X_test = X_test[:,:,np.newaxis]
+X_train = X_train.reshape(1224, 9, 9, 1)
+X_test = X_test.reshape(216, 9, 9, 1)
+
 #%%
-'''
-model = Sequential()
-#64 filters
-model.add(Conv1D(128, kernel_size=(10), activation='relu', input_shape=(X_train.shape[1],1))) #1st Conv layer
-#128 filters
-model.add(Conv1D(128, kernel_size=(10),activation='relu',kernel_regularizer=l2(0.01), bias_regularizer=l2(0.01))) #2nd Conv layer
-model.add(MaxPooling1D(pool_size=(8)))#pooling layer
-model.add(Dropout(0.4))
-model.add(Conv1D(256, kernel_size=(10),activation='relu')) # 3rd Conv layer
-model.add(MaxPooling1D(pool_size=(8))) #Another pooling layer
-model.add(Dropout(0.4))
-model.add(Flatten()) # finally flattened before dense layers
-model.add(Dense(256, activation='elu')) # dense layer
-model.add(Dropout(0.4))
-model.add(Dense(8, activation='softmax')) # output layer 
-model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=tf.keras.optimizers.SGD(learning_rate=0.0001))
-model.summary()
-
-#Baseline FNN model: 
-
-model=Sequential()
-###first layer
-model.add(Dense(100,input_shape=(209,)))
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-###second layer
-model.add(Dense(224))
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-###third layer
-model.add(Dense(180))
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-###4th layer
-model.add(Dense(100))
-model.add(Activation('relu'))
-###final layer
-model.add(Dense(8))
-model.add(Activation('softmax'))
-model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001))
-'''
 # %%
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization
@@ -199,16 +151,16 @@ import tensorflow as tf
 #%%
 # Define the 2D CNN architecture
 model = Sequential()
-model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(1224, 209, 1)))
+model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(9, 9, 1)))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 model.add(BatchNormalization())
 
-model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(BatchNormalization())
+#model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
+#model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding='same'))
+#model.add(BatchNormalization())
 
 model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(MaxPooling2D(pool_size=(2, 2),strides=(2, 2), padding='same'))
 model.add(BatchNormalization())
 
 model.add(Flatten())
@@ -216,15 +168,15 @@ model.add(Dense(128, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(8, activation='softmax'))
 #%%
-X_train = np.reshape(X_train, (X_train.shape[0], 1224, 209, 1))
-X_test = np.reshape(X_test, (X_test.shape[0], 1224, 209, 1))
+#X_train = np.reshape(X_train, ( 1224,X_train.shape[1], 91, 1))
+#X_test = np.reshape(X_test, (X_test.shape[0], 1224, 209, 1))
 #%%
 # Compile the model with an appropriate optimizer, loss function and metrics
 model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=Adam(learning_rate=0.0001))
 # %%
 checkpoint = ModelCheckpoint("best_initial_model.hdf5", monitor='val_accuracy', verbose = 1, save_best_only = True, mode='max')
 
-model_history = model.fit(X_train, y_train, batch_size=32, epochs=10, validation_data = (X_test, y_test), callbacks = [checkpoint])
+model_history = model.fit(X_train, y_train, batch_size=32, epochs=100, validation_data = (X_test, y_test), callbacks = [checkpoint])
 
 # %%
 model.evaluate(X_test, y_test)
