@@ -107,16 +107,22 @@ df_main = pd.concat([audio_tab, df], axis = 1)
 
 
 #%%
-for i in range(len(df_main['mel_spectrogram'])):
-    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].astype(np.float32)
+#for i in range(len(df_main['mel_spectrogram'])):
+#    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].astype(np.#float32)
 #%%
-for i in range(len(df_main['mel_spectrogram'])):
-    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].flatten()
+#for i in range(len(df_main['mel_spectrogram'])):
+#    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].flatten()
 
 #%%
-for i in range(len(df_main['mel_spectrogram'])):
-    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].tolist()
+#for i in range(len(df_main['mel_spectrogram'])):
+#    df_main['mel_spectrogram'][i] = df_main['mel_spectrogram'][i].tolist()
 
+#%%
+split_df = pd.DataFrame(df_main['mel_spectrogram'].tolist())
+split_df = split_df.iloc[:,:209]
+
+#%%
+df_main = pd.concat([audio_tab, split_df], axis = 1)
 # %%
 #splitting into training and testing:
 train_data, test_data = train_test_split(df_main, test_size=0.15, random_state=0)
@@ -129,7 +135,9 @@ y_test = test_data.loc[:, 'emotion'] #test target label
 
 # %%
 #converting into np array:
+X_train = np.array(X_train, dtype = np.float32)
 y_train = np.array(y_train, dtype = np.float32)
+X_test = np.array(X_test, dtype = np.float32)
 y_test = np.array(y_test, dtype = np.float32)
 
 # %%
@@ -159,12 +167,12 @@ model.add(Dropout(0.4))
 model.add(Dense(8, activation='softmax')) # output layer 
 model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=tf.keras.optimizers.SGD(learning_rate=0.0001))
 model.summary()
-'''
-#Baseline CNN model: 
+
+#Baseline FNN model: 
 
 model=Sequential()
 ###first layer
-model.add(Dense(100,input_shape=(259,)))
+model.add(Dense(100,input_shape=(209,)))
 model.add(Activation('relu'))
 model.add(Dropout(0.5))
 ###second layer
@@ -182,12 +190,41 @@ model.add(Activation('relu'))
 model.add(Dense(8))
 model.add(Activation('softmax'))
 model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001))
+'''
+# %%
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization
+from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+#%%
+# Define the 2D CNN architecture
+model = Sequential()
+model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(1224, 209, 1)))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(BatchNormalization())
 
+model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(BatchNormalization())
+
+model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(BatchNormalization())
+
+model.add(Flatten())
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(8, activation='softmax'))
+#%%
+X_train = np.reshape(X_train, (X_train.shape[0], 1224, 209, 1))
+X_test = np.reshape(X_test, (X_test.shape[0], 1224, 209, 1))
+#%%
+# Compile the model with an appropriate optimizer, loss function and metrics
+model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=Adam(learning_rate=0.0001))
 # %%
 checkpoint = ModelCheckpoint("best_initial_model.hdf5", monitor='val_accuracy', verbose = 1, save_best_only = True, mode='max')
 
-model_history = model.fit(X_train, y_train, batch_size=120, epochs=300, validation_data = (X_test, y_test), callbacks = [checkpoint])
+model_history = model.fit(X_train, y_train, batch_size=32, epochs=10, validation_data = (X_test, y_test), callbacks = [checkpoint])
 
 # %%
 model.evaluate(X_test, y_test)
-# %%
