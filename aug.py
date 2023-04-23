@@ -1,3 +1,4 @@
+#%%
 import pandas as pd
 import numpy as np
 
@@ -36,10 +37,10 @@ import warnings
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
+#%%
 cwd = os.getcwd()
 Ravdess = cwd + os.path.sep + 'ravdess' + os.path.sep
-
+#%%
 ravdess_directory_list = os.listdir(Ravdess)
 file_emotion = []
 file_statement = []
@@ -53,95 +54,8 @@ for dir in ravdess_directory_list:
         # third part in each file represents the emotion associated to that auido.
         file_emotion.append(int(part[2]))
         file_statement.append(int(part[4]))
-        file_path.append(Ravdess + dir + '/' + file)
-
-# dataframe for emotion of files
-# emotion_df = pd.DataFrame(file_emotion, columns=['Emotions'])
-
-# dataframe for path of files.
-# path_df = pd.DataFrame(file_path, columns=['Path'])
-# Ravdess_df = pd.concat([emotion_df, path_df], axis=1)
-Ravdess_df = pd.DataFrame({"Emotions": file_emotion, "Statement": file_statement, "Path": file_path})
-
-# changing integers to actual emotions.
-Ravdess_df.Emotions.replace(
-    {1: 'neutral', 2: 'calm', 3: 'happy', 4: 'sad', 5: 'angry', 6: 'fear', 7: 'disgust', 8: 'surprise'}, inplace=True)
-print(Ravdess_df.head())
-
-
-print(Ravdess_df.shape)
-
-
-Ravdess_df.groupby(['Emotions','Statement']).size().unstack()
-
-
-# creating a copy
-data_path = Ravdess_df[['Emotions','Path']].copy()
-data_path.to_csv("data_path.csv",index=False)
-data_path.head()
-
-
-# plt.title('Count of Emotions', size=16)
-# sns.countplot(data_path.Emotions)
-# plt.ylabel('Count', size=12)
-# plt.xlabel('Emotions', size=12)
-# sns.despine(top=True, right=True, left=False, bottom=False)
-# plt.show()
-
-
-def create_waveplot(data, sr):
-    plt.figure(figsize=(10, 3))
-    plt.title('Waveplot for audio', size=15)
-    librosa.display.waveshow(data, sr=sr)
-    plt.show()
-
-def create_spectrogram(data, sr):
-    # stft function converts the data into short term fourier transform
-    X = librosa.stft(data)
-    Xdb = librosa.amplitude_to_db(abs(X))
-    plt.figure(figsize=(12, 3))
-    plt.title('Spectrogram for audio', size=15)
-    librosa.display.specshow(Xdb, sr=sr, x_axis='time', y_axis='hz')
-    #librosa.display.specshow(Xdb, sr=sr, x_axis='time', y_axis='log')
-    plt.colorbar()
-
-
-#path = "/kaggle/input/ravdess-emotional-speech-audio/Actor_01/03-01-01-01-01-01-01.wav"
-path = Ravdess + 'Actor_01' + os.path.sep + '03-01-01-01-01-01-01.wav'
-data, sampling_rate = librosa.load(path)
-create_waveplot(data, sampling_rate)
-Audio(path)
-
-emotion='fear'
-path = np.array(data_path.Path[data_path.Emotions==emotion])[1]
-data, sampling_rate = librosa.load(path)
-create_waveplot(data, sampling_rate)
-create_spectrogram(data, sampling_rate)
-Audio(path)
-
-
-emotion='angry'
-path = np.array(data_path.Path[data_path.Emotions==emotion])[1]
-data, sampling_rate = librosa.load(path)
-create_waveplot(data, sampling_rate)
-create_spectrogram(data, sampling_rate)
-Audio(path)
-
-emotion='sad'
-path = np.array(data_path.Path[data_path.Emotions==emotion])[1]
-data, sampling_rate = librosa.load(path)
-create_waveplot(data, sampling_rate)
-create_spectrogram(data, sampling_rate)
-Audio(path)
-
-
-emotion='happy'
-path = np.array(data_path.Path[data_path.Emotions==emotion])[1]
-data, sampling_rate = librosa.load(path)
-create_waveplot(data, sampling_rate)
-create_spectrogram(data, sampling_rate)
-Audio(path)
-
+        file_path.append(Ravdess + dir + os.path.sep + file)
+#%%
 
 def noise(data):
     noise_amp = 0.035*np.random.uniform()*np.amax(data)
@@ -157,36 +71,6 @@ def shift(data):
 
 def pitch(data, sampling_rate, pitch_factor=0.7):
     return librosa.effects.pitch_shift(data, sr=sampling_rate, n_steps=pitch_factor)
-
-# taking any example and checking for techniques.
-path = np.array(data_path.Path)[1]
-data, sample_rate = librosa.load(path)
-
-
-plt.figure(figsize=(14,4))
-librosa.display.waveshow(y=data, sr=sample_rate)
-Audio(path)
-
-x = noise(data)
-plt.figure(figsize=(14,4))
-librosa.display.waveshow(y=x, sr=sample_rate)
-Audio(x, rate=sample_rate)
-
-
-x = stretch(data)
-plt.figure(figsize=(14,4))
-librosa.display.waveshow(y=x, sr=sample_rate)
-Audio(x, rate=sample_rate)
-
-x = shift(data)
-plt.figure(figsize=(14,4))
-librosa.display.waveshow(y=x, sr=sample_rate)
-Audio(x, rate=sample_rate)
-
-x = pitch(data, sample_rate)
-plt.figure(figsize=(14,4))
-librosa.display.waveshow(y=x, sr=sample_rate)
-Audio(x, rate=sample_rate)
 
 
 def extract_features(data):
@@ -211,7 +95,7 @@ def transform_audio(data, fns):
 
 def get_features(path):
     # duration and offset are used to take care of the no audio in start and the ending of each audio files as seen above.
-    data, sample_rate = librosa.load(path, duration=2.5, offset=0.6)
+    data, sample_rate = librosa.load(path, duration=3.0)
 
 
     #randomly transforming audio data
@@ -219,9 +103,7 @@ def get_features(path):
 
     fn1_data = transform_audio(data, fns)
     fn2_data = transform_audio(fn1_data, fns)
-    res1 = extract_features(fn2_data)
-    result = [np.array(res1[:,:108])]
-
+    
     fn1_data = transform_audio(data, fns)
     fn2_data = transform_audio(fn1_data, fns)
     res2 = extract_features(fn2_data)[:,:108]

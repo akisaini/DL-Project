@@ -39,13 +39,11 @@ Repetition (01 = 1st repetition, 02 = 2nd repetition).
 Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
 # %%
-emotion = []
-gender = []
-intensity = []
-file_path = []
+
 # %%
 import glob       
 
+file_path = []
 rootdir = 'C:\\Users\\saini\\Documents\\GWU\\6450,11-23SP-CC\\Project\\ravdess'
 for main_path in glob.glob(f'{rootdir}/*/**'):
     splt = main_path.split('\\')
@@ -53,7 +51,78 @@ for main_path in glob.glob(f'{rootdir}/*/**'):
     file_path.append(splt[-1])
 #%%   
 #getting gender, emotion, actor(M/F) 
-for i in range(len(file_path)):
+
+# %%
+
+# %%
+#EXTRACTING LOG MEL SPECTROGRAM MEAN VALUES
+
+counter=0
+main_path = []
+for i in glob.glob(f'{rootdir}/*/**'):
+    main_path.append(i)
+
+#%%
+def noise(data):
+    noise_amp = 0.035*np.random.uniform()*np.amax(data)
+    data = data + noise_amp*np.random.normal(size=data.shape[0])
+    return data
+
+def stretch(data, rate=0.85):
+    return librosa.effects.time_stretch(data, rate=rate)
+
+def shift(data):
+    shift_range = int(np.random.uniform(low=-5, high = 5)*1000)
+    return np.roll(data, shift_range)
+
+def pitch(data, sampling_rate, pitch_factor=0.7):
+    return librosa.effects.pitch_shift(data, sr=sampling_rate, n_steps=pitch_factor)
+
+# funtion to transform audio
+def transform_audio(data, fns, sample_rate):
+    fn = random.choice(fns)
+    if fn == pitch:
+        fn_data = fn(data, sample_rate)
+    elif fn == "None":
+        fn_data = data
+    elif fn in [noise, stretch]:
+        fn_data = fn(data)
+    else:
+        fn_data = data
+    return fn_data
+
+#%%
+emotion = []
+gender = []
+intensity = []
+
+fns = [noise, pitch, "None"]
+num = []
+sr_lst = []
+for i in range(len(main_path)):
+    X, sample_rate = librosa.load(main_path[i],duration=3,sr=38500)
+    num.append(X)
+    sr_lst.append(sample_rate)
+    info = file_path[i].split('-')
+    #print(info)
+    emotion.append(info[2])
+    intensity.append(info[3])
+    gender.append(info[-1])
+    
+    fn1_data = transform_audio(X, fns, sample_rate)
+    fn2_data = transform_audio(fn1_data, fns, sample_rate)
+    num.append(fn2_data)
+    #for i in range(len(file_path)):
+    info = file_path[i].split('-')
+    #print(info)
+    emotion.append(info[2])
+    intensity.append(info[3])
+    gender.append(info[-1])
+    
+    fn1_data = transform_audio(X, fns, sample_rate)
+    fn2_data = transform_audio(fn1_data, fns, sample_rate)
+    num.append(fn2_data)
+    #for i in range(len(file_path)):
     info = file_path[i].split('-')
     #print(info)
     emotion.append(info[2])
@@ -71,36 +140,25 @@ act_gender = list(map(int, act_gender))
 act_gender = ['F' if i%2==0 else 'M' for i in act_gender]
 # %%
 audio_tab = pd.DataFrame(emotion)
-# %%
+
 audio_tab.replace({1:'neutral', 2:'calm', 3:'happy', 4:'sad', 5:'angry', 6:'fear', 7:'disgust', 8:'surprise'}, inplace=True)
 audio_tab = pd.concat([pd.DataFrame(act_gender), audio_tab, pd.DataFrame(intensity), pd.DataFrame(file_path)], axis = 1)
 audio_tab.columns = ['gender', 'emotion', 'intensity', 'path']
-# %%
-#EXTRACTING LOG MEL SPECTROGRAM MEAN VALUES
-df = pd.DataFrame(columns=['mel_spectrogram'])
-counter=0
-main_path = []
-for i in glob.glob(f'{rootdir}/*/**'):
-    main_path.append(i)
-
-#%%
-num = []
-sr_lst = []
-for i in range(len(main_path)):
-    X, sample_rate = librosa.load(main_path[i],duration=3,sr=38500)
-    num.append(X)
-    sr_lst.append(sample_rate)
 
 #%%
 log_spectrogram = []
 for i in range(len(num)):
-    spec = librosa.feature.melspectrogram(y=num[i], sr=sr_lst[i], n_mels=128,fmax=8000) 
+    spec = librosa.feature.melspectrogram(y=num[i], sr=38500, n_mels=128,fmax=8000) 
     db_spec = librosa.power_to_db(spec)
     #temporally average spectrogram
     log_spectrogram.append(np.mean(db_spec, axis = 0))
-        
-df['mel_spectrogram'] = log_spectrogram
 
+df = pd.DataFrame(columns=['mel_spectrogram'])
+df['mel_spectrogram'] = log_spectrogram
+print(len(df))
+print(len(audio_tab))
+
+#%%
 df_main = pd.concat([audio_tab, df], axis = 1)
 
 #%%
@@ -139,8 +197,8 @@ lb = LabelEncoder()
 y_train = to_categorical(lb.fit_transform(y_train))
 y_test = to_categorical(lb.fit_transform(y_test))
 # %%
-X_train = X_train.reshape(1224, 14, 14, 1)
-X_test = X_test.reshape(216, 14, 14, 1)
+X_train = X_train.reshape(3672, 14, 14, 1)
+X_test = X_test.reshape(648, 14, 14, 1)
 
 # %%
 from tensorflow.keras.models import Sequential
@@ -158,7 +216,7 @@ model.add(BatchNormalization())
 #model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding='same'))
 #model.add(BatchNormalization())
 
-model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
+model.add(Conv2D(256, kernel_size=(3, 3), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2),strides=(2, 2), padding='same'))
 model.add(BatchNormalization())
 
@@ -168,7 +226,7 @@ model.add(Dropout(0.5))
 model.add(Dense(8, activation='softmax'))
 #%%
 # Compile the model with an appropriate optimizer, loss function and metrics
-model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=SGD(learning_rate=0.0001))
+model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=Adam(learning_rate=0.001))
 # %%
 checkpoint = ModelCheckpoint("best_initial_model.hdf5", monitor='val_accuracy', verbose = 1, save_best_only = True, mode='max')
 
