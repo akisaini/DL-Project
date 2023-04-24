@@ -39,7 +39,7 @@ Repetition (01 = 1st repetition, 02 = 2nd repetition).
 Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
 
-x, sr = librosa.load('03-01-01-01-01-01-01.wav')
+x, sr = librosa.load('ravdess/actor_01/03-01-03-01-01-01-01.wav')
 sf.write('03-01-01-01-01-01-01.wav', x, sr)
 #x is the audio time series
 #sr is the sampling rate of x
