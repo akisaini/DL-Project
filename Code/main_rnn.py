@@ -1,20 +1,24 @@
-#%%
-from threading import local
+# from threading import local
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 import numpy as np
 import librosa
-from IPython.display import Audio #helps play sound
+# from IPython.display import Audio #helps play sound
 import os
 import sys
 import soundfile as sf
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical
+from sklearn.metrics import accuracy_score, f1_score
+import glob
+
 import torch
 import torch.nn as nn
-#%%
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import random
+
 '''
 Understanding file formatting:
 
@@ -33,6 +37,7 @@ Repetition (01 = 1st repetition, 02 = 2nd repetition).
 Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
 
+'''
 x, sr = librosa.load('03-01-01-01-01-01-01.wav')
 sf.write('03-01-01-01-01-01-01.wav', x, sr)
 #x is the audio time series
@@ -51,212 +56,296 @@ spectrogram = librosa.power_to_db(spectrogram)
 librosa.display.specshow(spectrogram, y_axis='mel', fmax=8000, x_axis='time');
 plt.title('Mel Spectrogram - Male Neutral')
 plt.colorbar(format='%+2.0f dB');
-# %%
+'''
+
+
 emotion = []
-gender = []
 intensity = []
 file_path = []
-# %%
-import glob       
-
-rootdir = 'C:\\Users\\saini\\Documents\\GWU\\6450,11-23SP-CC\\Project\\ravdess'
-for main_path in glob.glob(f'{rootdir}/*/**'):
-    splt = main_path.split('\\')
-    print(splt[-1]) #getting all the audio filenames to create gender specific tabular audio data. 
-    file_path.append(splt[-1])
-#%%   
-#getting gender, emotion, actor(M/F) 
-for i in range(len(file_path)):
-    info = file_path[i].split('-')
-    #print(info)
-    emotion.append(info[2])
-    intensity.append(info[3])
-    gender.append(info[-1])
-    
-# %%
 act_gender = []
-for i in gender:
-    gend = i.split('.')
-    act_gender.append(gend[0])
-    
-#converting list elements from str to int
-act_gender = list(map(int, act_gender))
-act_gender = ['F' if i%2==0 else 'M' for i in act_gender]
-# %%
-audio_tab = pd.DataFrame(emotion)
-# %%
-audio_tab.replace({1:'neutral', 2:'calm', 3:'happy', 4:'sad', 5:'angry', 6:'fear', 7:'disgust', 8:'surprise'}, inplace=True)
-audio_tab = pd.concat([pd.DataFrame(act_gender), audio_tab, pd.DataFrame(intensity), pd.DataFrame(file_path)], axis = 1)
-audio_tab.columns = ['gender', 'emotion', 'intensity', 'path']
-# %%
-#EXTRACTING LOG MEL SPECTROGRAM MEAN VALUES
-df = pd.DataFrame(columns=['mel_spectrogram'])
-counter=0
 main_path = []
-for i in glob.glob(f'{rootdir}/*/**'):
-    main_path.append(i)
+origin = []
 
-#%%
-num = []
-sr_lst = []
-for i in range(len(main_path)):
-    X, sample_rate = librosa.load(main_path[i],duration=3,sr=44100,offset=0.5)
-    num.append(X)
-    sr_lst.append(sample_rate)
-    #get the mel-scaled spectrogram (ransform both the y-axis (frequency) to log scale, and the “color” axis (amplitude) to Decibels, which is kinda the log scale of amplitudes.)
-#%%
+rootdir = os.getcwd() + os.path.sep + 'ravdess'
+# print(rootdir)
+
+# getting gender, emotion, actor(M/F)
+for path in glob.glob(f'{rootdir}/*/**'):
+    main_path.append(path)
+
+    path_short = path.split(os.path.sep)[-1]  # getting all the audio filenames to create gender specific tabular audio data.
+
+    file_path.append(path)
+
+    info = path_short.split('-')
+    emotion.append(int(info[2]) - 1)
+    intensity.append(info[3])
+    gender = int(info[-1].split('.')[0])
+    act_gender.append('F' if gender % 2 == 0 else 'M')
+    origin.append(True)
+
+audio_tab = pd.DataFrame.from_dict({
+    'gender': act_gender,
+    'emotion': emotion,
+    'intensity': intensity,
+    'path': file_path,
+    'origin': origin,
+})
+
+audio_tab_new = audio_tab.copy()
+audio_tab_new['origin'] = False
+
+audio_natural = audio_tab_new[(audio_tab_new['emotion'] == 0)].copy()
+
+pd_audio = pd.concat([audio_tab, audio_natural, audio_tab_new, audio_natural, audio_tab_new, audio_natural, audio_tab_new, audio_natural])
+
+total_num = len(pd_audio)
+test_size = 0.2
+test_num = int(round(total_num * test_size, 0))
+train_num = total_num - test_num
+
+print(total_num, test_num, train_num, test_size)
+
+from sklearn.utils import shuffle
+pd_audio = shuffle(pd_audio, random_state=7)
+
+# print(list(pd_audio['emotion']))
+
+import collections
+
+print(collections.Counter(pd_audio['emotion']))
+
+def noise(data):
+    noise_amp = 0.035*np.random.uniform()*np.amax(data)
+    data = data + noise_amp*np.random.normal(size=data.shape[0])
+    return data
+
+def stretch(data, rate=0.85):
+    return librosa.effects.time_stretch(data, rate=rate)
+
+def shift(data):
+    shift_range = int(np.random.uniform(low=-5, high = 5)*1000)
+    return np.roll(data, shift_range)
+
+def pitch(data, sampling_rate, pitch_factor=0.7):
+    return librosa.effects.pitch_shift(data, sr=sampling_rate, n_steps=pitch_factor)
+
+def transform_audio(data, fns, sampling_rate):
+    fn = random.choice(fns)
+    if fn == pitch:
+        fn_data = fn(data, sampling_rate)
+    elif fn == "None":
+        fn_data = data
+    elif fn in [noise, stretch]:
+        fn_data = fn(data)
+    else:
+        fn_data = data
+    return fn_data
+
+# get the mel-scaled spectrogram (ransform both the y-axis (frequency) to log scale,
+# and the “color” axis (amplitude) to Decibels, which is kinda the log scale of amplitudes.)
 log_spectrogram = []
-for i in range(len(num)):
-    spec = librosa.feature.melspectrogram(y=num[i], sr=sr_lst[i], n_mels=128,fmax=8000) 
-    db_spec = librosa.power_to_db(spec)
-    #temporally average spectrogram
-    log_spectrogram.append(np.mean(db_spec, axis = 0))
-        
-df['mel_spectrogram'] = log_spectrogram
+emotion_lst = []
+fns = [noise, pitch, stretch, shift] # "None"
 
-df_main = pd.concat([audio_tab, df], axis = 1)
+for i in range(len(pd_audio)):
+    item = pd_audio.iloc[i].path
+    y, sample_rate = librosa.load(item, duration=3, sr=44100)  # Load an audio file as a floating point time series.
 
-#%%
-split_df = pd.DataFrame(df_main['mel_spectrogram'].tolist())
+    if pd_audio.iloc[i].origin is False:
+        fn1_data = transform_audio(y, fns, sample_rate)
+        y = transform_audio(fn1_data, fns, sample_rate)
 
-#The final tabular dataframe containing frequency in dB 
-df_main = pd.concat([audio_tab, split_df], axis = 1)
+    spec = librosa.feature.melspectrogram(y=y, sr=sample_rate, n_mels=128, fmax=8000)
+    db_spec = librosa.power_to_db(spec)  # Convert a power spectrogram (amplitude squared) to decibel (dB) units
+    # temporally average spectrogram
+    log_spectrogram.append(np.mean(db_spec, axis=0))
+    if i % 100 == 0:
+        print('do preprossing', i//100)
 
-#%%
-#Imputing NaN's:
-for i in range(0, 1440):
-    df_main.iloc[i,4:] = df_main.iloc[i,4:].fillna(df_main.iloc[i,4:].median())
+max_row_length = max([len(row) for row in log_spectrogram])
+
+padded_list_of_lists = []
+for row in log_spectrogram:
+    padding_length = max_row_length - len(row)
+    if padding_length > 0:
+        # avg_value = np.mean(row[4:])
+        avg_value = 0
+        padded_row = np.pad(row, (0, padding_length), mode='constant', constant_values=avg_value)
+        padded_list_of_lists.append(padded_row[4:])
+    else:
+        padded_list_of_lists.append(row[4:])
+
+# Convert the padded list of lists into a NumPy array
+padded_array = np.array(padded_list_of_lists)[:, :250]
+
+
+# ohe of target variable using label encoder:
+lb = LabelEncoder()
+# y_all = to_categorical(lb.fit_transform(np.array(emotion)))
+y_all = list(pd_audio['emotion'])
+
 # %%
-#splitting into training and testing:
-train_data, test_data = train_test_split(df_main, test_size=0.15, random_state=0)
-#%%
-X_train = train_data.iloc[:, 4:]
-y_train = train_data.loc[:,'emotion'] #train target label
+# splitting into training and testing:
+X_train, X_test, y_train, y_test = train_test_split(padded_array, y_all, test_size=test_size, random_state=0)
 
-X_test = test_data.iloc[:, 4:]
-y_test = test_data.loc[:, 'emotion'] #test target label
 
-#%%
-#Normalizing the data 
+# Normalizing the data
 mean = np.mean(X_train, axis=0)
 std = np.std(X_train, axis=0)
-X_train = (X_train - mean)/std
-X_test = (X_test - mean)/std
-# %%
-#converting into np array:
+X_train = (X_train - mean) / std
+X_test = (X_test - mean) / std
 
-X_train = np.array(X_train)
-y_train = np.array(y_train)
-X_test = np.array(X_test)
-y_test = np.array(y_test)
-# %%
-#ohe of target variable using label encoder:
-lb = LabelEncoder()
-y_train = to_categorical(lb.fit_transform(y_train))
-y_test = to_categorical(lb.fit_transform(y_test))
-# %%
-#Reshape data to include 3D tensor
-X_train = X_train[:,:,np.newaxis]
-X_test = X_test[:,:,np.newaxis]
+# print(X_train.shape)
+print('X_train.shape:', X_train.shape)
+# size = int(input())
 
-#%%
-
+# %%
+# Reshape data to include 3D tensor
 # Reshape and convert the input array to a PyTorch tensor
-X_train = torch.tensor(np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1)), dtype=torch.float)
-#%%
-y_train = y_train.reshape(-1, 8)
+X_train = torch.tensor(X_train, dtype=torch.float).reshape(train_num, 5, 1, -1)
+X_test = torch.tensor(X_test, dtype=torch.float).reshape(test_num, 5, 1, -1)
+
 y_train = torch.tensor(y_train, dtype=torch.float)
+y_test = torch.tensor(y_test, dtype=torch.float)
+print('get data and ready to train:', X_train.shape, X_test.shape)
 
-#%%
+# %%
 # Define the training parameters
-input_size = X_train.shape[2]
-hidden_size = 10
-output_size = y_train.shape[1]
-learning_rate = 0.01
-max_epochs = 30
+input_size = X_train.shape[3]
+hidden_size = 96
+# n_categories = y_train.shape[1]
+n_categories = 8
 
-# Define the RNN model
+print('input_size:', input_size, '  hidden_size:', hidden_size)
+
 class RNN(nn.Module):
+    # implement RNN from scratch rather than using nn.RNN
     def __init__(self, input_size, hidden_size, output_size):
         super(RNN, self).__init__()
+
         self.hidden_size = hidden_size
         self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
-        self.h2o = nn.Linear(hidden_size, output_size)
-        self.sigmoid = nn.Sigmoid()
+        self.i2o1 = nn.Linear(input_size + hidden_size, 64)
+        self.i2o2 = nn.Linear(64, output_size)
+        self.softmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, input, hidden):
-        combined = torch.cat((input, hidden), 1)
+    def forward(self, input_tensor, hidden_tensor):
+        combined = torch.cat((input_tensor, hidden_tensor), 1)
+
         hidden = self.i2h(combined)
-        output = self.h2o(hidden)
-        output = self.sigmoid(output)
+        output = self.i2o1(combined)
+        output = self.i2o2(output)
+        output = self.softmax(output)
         return output, hidden
 
-    def initHidden(self):
+    def init_hidden(self):
         return torch.zeros(1, self.hidden_size)
 
-# Convert the input and target arrays to PyTorch tensors
-X_train = torch.tensor(X_train, dtype=torch.float)
-y_train = torch.tensor(y_train, dtype=torch.float)
 
+rnn = RNN(input_size, hidden_size, n_categories)
+print('the original model')
 
-# Initialize the RNN model and the optimizer
-rnn = RNN(input_size, hidden_size, output_size)
-criterion = nn.BCELoss()
+criterion = nn.NLLLoss()
+learning_rate = 0.001
 optimizer = torch.optim.SGD(rnn.parameters(), lr=learning_rate)
+# optimizer = torch.optim.Adam(rnn.parameters(), lr=learning_rate)
+scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=0, verbose=True)
 
-#%%
+max_epochs = 150
+
+
+def train(line_tensor, category_tensor):
+    hidden = rnn.init_hidden()
+
+    for i in range(line_tensor.size()[0]):
+        output, hidden = rnn(line_tensor[i], hidden)
+
+    loss = criterion(output, category_tensor)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    return output, loss.item()
+
+
+# %%
+def predict(line_tensor, category_tensor):
+    with torch.no_grad():
+        hidden = rnn.init_hidden()
+
+        for i in range(line_tensor.size()[0]):
+            output, hidden = rnn(line_tensor[i], hidden)
+
+        loss = criterion(output, category_tensor)
+
+        return output, loss.item()
+
+
+train_loss_lst = []
+test_loss_lst = []
+acc_train_lst = []
+acc_test_lst = []
+
+
 # Train the RNN model
-for epoch in range(1, max_epochs+1):
-    loss = 0
+for epoch in range(1, max_epochs + 1):
+
+    train_loss, steps_train = 0, 0
+    test_loss, steps_test = 0, 0
+    pred_train = []
+
     for i in range(X_train.size(0)):
-        hidden = rnn.initHidden()
-        
-        optimizer.zero_grad()
+        category_tensor = y_train[i].reshape(1).type(torch.LongTensor)
+        line_tensor = X_train[i]
+        output, loss = train(line_tensor, category_tensor)
+        output_item = torch.argmax(output).item()
+        pred_train.append(output_item)
 
-        # Pass the entire sequence through the RNN
-        for j in range(X_train.size(1)):
-            output, hidden = rnn(X_train[i][j].unsqueeze(0), hidden)
+        train_loss += loss
+        steps_train += 1
 
-        # Compute loss on the final output only
-        err = criterion(output[-1], y_train[i])
-        loss += err.item()
-        err.backward()
-        optimizer.step()
+    avg_train_loss = train_loss / steps_train
 
-    print(f"Epoch {epoch} loss: {loss/X_train.size(0)}")
+    pred = []
+    for i in range(X_test.shape[0]):
+        output, loss = predict(X_test[i], y_test[i].reshape(1).type(torch.LongTensor))
+        output_item = torch.argmax(output).item()
+        pred.append(output_item)
 
-#Epoch 30 loss: 0.355356015751954
+        test_loss += loss
+        steps_test += 1
 
-# %%
-# Convert the validation set to PyTorch tensors
-X_test = torch.tensor(X_test, dtype=torch.float)
-y_test = torch.tensor(y_test, dtype=torch.float)
+    avg_test_loss = test_loss / steps_test
+    # scheduler.step(avg_train_loss)
 
-# Set the model to evaluation`` mode
-rnn.eval()
+    acc_train = f1_score(pred_train, y_train, average='micro')
+    acc_test = f1_score(pred, y_test, average='micro')
 
-# Initialize variables for accuracy calculation
-# Initialize variables for accuracy calculation
-correct = 0
-total = 0
+    print('epoch', epoch, 'loss', avg_train_loss, 'f1_score_train', acc_train, 'f1_score_test', acc_test)
 
-# Iterate over the validation set
-for i in range(X_test.shape[0]):
-    hidden = rnn.initHidden()
-    
-    # Pass the entire sequence through the RNN
-    for j in range(X_test.shape[1]):
-        output, hidden = rnn(X_test[i][j].unsqueeze(0), hidden)
-    
-    # Get the predicted label
-    pred = (output[-1] >= 0.5)
-    
-    # Update the variables for accuracy calculation
-    total += 1
-    correct += torch.all(torch.eq(pred, y_test[i]))
+    train_loss_lst.append(avg_train_loss)
+    test_loss_lst.append(avg_test_loss)
+    acc_train_lst.append(acc_train)
+    acc_test_lst.append(acc_test)
 
-# Calculate the accuracy
-accuracy = correct / total
-print(f"Validation set accuracy: {accuracy}")
-# %%
-#Validation set accuracy: 0.018518518656492233
+import matplotlib.pyplot as plt
+
+epochs = [i for i in range(max_epochs)]
+fig , ax = plt.subplots(1,2)
+
+fig.set_size_inches(20,6)
+
+ax[0].plot(epochs , train_loss_lst , label = 'Training Loss')
+ax[0].plot(epochs , test_loss_lst , label = 'Testing Loss')
+ax[0].set_title('Training & Testing Loss')
+ax[0].legend()
+ax[0].set_xlabel("Epochs")
+
+ax[1].plot(epochs , acc_train_lst , label = 'Training Accuracy')
+ax[1].plot(epochs , acc_test_lst , label = 'Testing Accuracy')
+ax[1].set_title('Training & Testing Accuracy')
+ax[1].legend()
+ax[1].set_xlabel("Epochs")
+plt.show()
