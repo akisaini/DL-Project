@@ -109,7 +109,7 @@ print(total_num, test_num, train_num, test_size)
 from sklearn.utils import shuffle
 pd_audio = shuffle(pd_audio, random_state=7)
 
-print(list(pd_audio['emotion']))
+# print(list(pd_audio['emotion']))
 
 import collections
 
@@ -146,7 +146,7 @@ def transform_audio(data, fns, sampling_rate):
 # and the “color” axis (amplitude) to Decibels, which is kinda the log scale of amplitudes.)
 log_spectrogram = []
 emotion_lst = []
-fns = [noise, pitch, "None"]
+fns = [noise, pitch, stretch, shift] # "None"
 
 for i in range(len(pd_audio)):
     item = pd_audio.iloc[i].path
@@ -203,8 +203,8 @@ print('X_train.shape:', X_train.shape)
 # %%
 # Reshape data to include 3D tensor
 # Reshape and convert the input array to a PyTorch tensor
-X_train = torch.tensor(X_train, dtype=torch.float).reshape(train_num, 10, 1, -1)
-X_test = torch.tensor(X_test, dtype=torch.float).reshape(test_num, 10, 1, -1)
+X_train = torch.tensor(X_train, dtype=torch.float).reshape(train_num, 5, 1, -1)
+X_test = torch.tensor(X_test, dtype=torch.float).reshape(test_num, 5, 1, -1)
 
 y_train = torch.tensor(y_train, dtype=torch.float)
 y_test = torch.tensor(y_test, dtype=torch.float)
@@ -217,6 +217,7 @@ hidden_size = 96
 # n_categories = y_train.shape[1]
 n_categories = 8
 
+print('input_size:', input_size, '  hidden_size:', hidden_size)
 
 class RNN(nn.Module):
     # implement RNN from scratch rather than using nn.RNN
@@ -225,14 +226,16 @@ class RNN(nn.Module):
 
         self.hidden_size = hidden_size
         self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
-        self.i2o = nn.Linear(input_size + hidden_size, output_size)
+        self.i2o1 = nn.Linear(input_size + hidden_size, 64)
+        self.i2o2 = nn.Linear(64, output_size)
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input_tensor, hidden_tensor):
         combined = torch.cat((input_tensor, hidden_tensor), 1)
 
         hidden = self.i2h(combined)
-        output = self.i2o(combined)
+        output = self.i2o1(combined)
+        output = self.i2o2(output)
         output = self.softmax(output)
         return output, hidden
 
@@ -246,9 +249,10 @@ print('the original model')
 criterion = nn.NLLLoss()
 learning_rate = 0.001
 optimizer = torch.optim.SGD(rnn.parameters(), lr=learning_rate)
+# optimizer = torch.optim.Adam(rnn.parameters(), lr=learning_rate)
 scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=0, verbose=True)
 
-max_epochs = 50
+max_epochs = 150
 
 
 def train(line_tensor, category_tensor):
@@ -277,6 +281,12 @@ def predict(line_tensor, category_tensor):
         loss = criterion(output, category_tensor)
 
         return output, loss.item()
+
+
+train_loss_lst = []
+test_loss_lst = []
+acc_train_lst = []
+acc_test_lst = []
 
 
 # Train the RNN model
@@ -308,6 +318,34 @@ for epoch in range(1, max_epochs + 1):
         steps_test += 1
 
     avg_test_loss = test_loss / steps_test
-    # scheduler.step(avg_test_loss)
+    # scheduler.step(avg_train_loss)
 
-    print('epoch', epoch, 'loss', avg_train_loss, 'f1_score_train', f1_score(pred_train, y_train, average='micro'), 'f1_score_test', f1_score(pred, y_test, average='micro'))
+    acc_train = f1_score(pred_train, y_train, average='micro')
+    acc_test = f1_score(pred, y_test, average='micro')
+
+    print('epoch', epoch, 'loss', avg_train_loss, 'f1_score_train', acc_train, 'f1_score_test', acc_test)
+
+    train_loss_lst.append(avg_train_loss)
+    test_loss_lst.append(avg_test_loss)
+    acc_train_lst.append(acc_train)
+    acc_test_lst.append(acc_test)
+
+import matplotlib.pyplot as plt
+
+epochs = [i for i in range(max_epochs)]
+fig , ax = plt.subplots(1,2)
+
+fig.set_size_inches(20,6)
+
+ax[0].plot(epochs , train_loss_lst , label = 'Training Loss')
+ax[0].plot(epochs , test_loss_lst , label = 'Testing Loss')
+ax[0].set_title('Training & Testing Loss')
+ax[0].legend()
+ax[0].set_xlabel("Epochs")
+
+ax[1].plot(epochs , acc_train_lst , label = 'Training Accuracy')
+ax[1].plot(epochs , acc_test_lst , label = 'Testing Accuracy')
+ax[1].set_title('Training & Testing Accuracy')
+ax[1].legend()
+ax[1].set_xlabel("Epochs")
+plt.show()
