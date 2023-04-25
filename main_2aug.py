@@ -44,7 +44,9 @@ Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 import glob       
 
 file_path = []
-rootdir = 'C:\\Users\\saini\\Documents\\GWU\\6450,11-23SP-CC\\Project\\ravdess'
+path = os.getcwd()
+
+rootdir = path+os.path.sep+'ravdess'
 for main_path in glob.glob(f'{rootdir}/*/**'):
     splt = main_path.split('\\')
     print(splt[-1]) #getting all the audio filenames to create gender specific tabular audio data. 
