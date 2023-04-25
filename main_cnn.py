@@ -38,25 +38,6 @@ Repetition (01 = 1st repetition, 02 = 2nd repetition).
 
 Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
-
-x, sr = librosa.load('ravdess/actor_01/03-01-03-01-01-01-01.wav')
-sf.write('03-01-01-01-01-01-01.wav', x, sr)
-#x is the audio time series
-#sr is the sampling rate of x
-Audio(data = x, rate = sr)
-#%%
-#Create waveplot of speech input
-plt.figure(figsize=(8, 4))
-librosa.display.waveshow(x, sr = sr)
-plt.title('Waveplot - Male Neutral')
-plt.show()
-# %%
-#Create Spectogram of speech input for further analysis
-spectrogram = librosa.feature.melspectrogram(y=x, sr=sr, n_mels=128,fmax=8000) 
-spectrogram = librosa.power_to_db(spectrogram)
-librosa.display.specshow(spectrogram, y_axis='mel', fmax=8000, x_axis='time');
-plt.title('Mel Spectrogram - Male Neutral')
-plt.colorbar(format='%+2.0f dB');
 # %%
 emotion = []
 gender = []
@@ -64,8 +45,10 @@ intensity = []
 file_path = []
 # %%
 import glob       
+path = os.getcwd()
 
-rootdir = 'C:\\Users\\saini\\Documents\\GWU\\6450,11-23SP-CC\\Project\\ravdess'
+rootdir = path+os.path.sep+'ravdess'
+
 for main_path in glob.glob(f'{rootdir}/*/**'):
     splt = main_path.split('\\')
     print(splt[-1]) #getting all the audio filenames to create gender specific tabular audio data. 
