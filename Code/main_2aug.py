@@ -38,7 +38,6 @@ Repetition (01 = 1st repetition, 02 = 2nd repetition).
 
 Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
-# %%
 
 # %%
 import glob       
@@ -46,6 +45,7 @@ import glob
 file_path = []
 path = os.getcwd()
 
+#%%
 rootdir = path+os.path.sep+'ravdess'
 for main_path in glob.glob(f'{rootdir}/*/**'):
     splt = main_path.split('\\')
@@ -223,8 +223,8 @@ model.add(MaxPooling2D(pool_size=(2, 2),strides=(2, 2), padding='same'))
 model.add(BatchNormalization())
 
 model.add(Flatten())
-model.add(Dense(128, activation='relu'))
-model.add(Dropout(0.5))
+model.add(Dense(156, activation='relu'))
+model.add(Dropout(0.75))
 model.add(Dense(8, activation='softmax'))
 #%%
 # Compile the model with an appropriate optimizer, loss function and metrics
@@ -236,3 +236,29 @@ model_history = model.fit(X_train, y_train, batch_size=64, epochs=100, validatio
 
 # %%
 model.evaluate(X_test, y_test)
+
+#%%
+#Generating plots:
+
+epochs = [i for i in range(100)]
+fig , ax = plt.subplots(1,2)
+train_acc = model_history.history['accuracy']
+train_loss = model_history.history['loss']
+test_acc = model_history.history['val_accuracy']
+test_loss = model_history.history['val_loss']
+
+fig.set_size_inches(20,6)
+ax[0].plot(epochs , train_loss , label = 'Training Loss')
+ax[0].plot(epochs , test_loss , label = 'Testing Loss')
+ax[0].set_title('Training & Testing Loss')
+ax[0].legend()
+ax[0].set_xlabel("Epochs")
+
+ax[1].plot(epochs , train_acc , label = 'Training Accuracy')
+ax[1].plot(epochs , test_acc , label = 'Testing Accuracy')
+ax[1].set_title('Training & Testing Accuracy')
+ax[1].legend()
+ax[1].set_xlabel("Epochs")
+plt.show()
+
+# %%
