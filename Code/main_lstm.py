@@ -47,7 +47,8 @@ if not sys.warnoptions:
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 cwd = os.getcwd()
-Ravdess = os.path.dirname(os.path.dirname(cwd)) + os.path.sep + 'ravdess' + os.path.sep
+Ravdess = cwd + os.path.sep + 'ravdess' + os.path.sep
+
 print("Ravdess 1st",Ravdess)
 ravdess_directory_list = os.listdir(Ravdess)
 file_emotion = []
