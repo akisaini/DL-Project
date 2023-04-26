@@ -48,7 +48,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 cwd = os.getcwd()
 Ravdess = os.path.dirname(os.path.dirname(cwd)) + os.path.sep + 'ravdess' + os.path.sep
-
+print("Ravdess 1st",Ravdess)
 ravdess_directory_list = os.listdir(Ravdess)
 file_emotion = []
 file_statement = []
@@ -114,7 +114,7 @@ def create_spectrogram(data, sr):
     #librosa.display.specshow(Xdb, sr=sr, x_axis='time', y_axis='log')
     plt.colorbar()
 
-
+print("Ravdess 2nd",Ravdess)
 #path = "/kaggle/input/ravdess-emotional-speech-audio/Actor_01/03-01-01-01-01-01-01.wav"
 path = Ravdess + 'Actor_01' + os.path.sep + '03-01-01-01-01-01-01.wav'
 data, sampling_rate = librosa.load(path)
@@ -247,7 +247,7 @@ def get_features(path):
 
 #path = "/kaggle/input/ravdess-emotional-speech-audio/Actor_01/03-01-01-01-01-01-01.wav"
 
-path = cwd + os.path.sep + 'ravdess/' + 'Actor_01/03-01-01-01-01-01-01.wav'
+path = Ravdess + 'Actor_01' + os.path.sep + '03-01-01-01-01-01-01.wav'
 
 data, sampling_rate = librosa.load(path, duration=2.5, offset=0.6)
 #create_waveplot(data, sampling_rate, emotion)
