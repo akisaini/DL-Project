@@ -49,6 +49,11 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 cwd = os.getcwd()
 
 Ravdess = cwd + os.path.sep + 'ravdess' + os.path.sep
+
+if not os.path.exists(Ravdess):
+    os.chdir("..")  # Change to the parent directory
+    Ravdess = cwd + os.path.sep + 'ravdess' + os.path.sep
+
 print("Ravdess 1st",Ravdess)
 ravdess_directory_list = os.listdir(Ravdess)
 file_emotion = []
