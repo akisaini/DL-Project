@@ -324,37 +324,26 @@ input_shape #(108, 162, 1, 1)
 
 model=Sequential()
 
-model.add(TimeDistributed(Conv1D(32, 3, padding='same', activation='relu'), input_shape=input_shape))
+model.add(TimeDistributed(Conv1D(16, 3, padding='same', activation='relu'),
+                            input_shape=input_shape))
 model.add(TimeDistributed(BatchNormalization()))
-model.add(TimeDistributed(Conv1D(64, 3, padding='same', activation='relu')))
-model.add(TimeDistributed(BatchNormalization()))
-model.add(TimeDistributed(Conv1D(128, 3, padding='same', activation='relu')))
-model.add(TimeDistributed(BatchNormalization()))
+#model.add(TimeDistributed(MaxPooling2D((2,1))))
 
 model.add(TimeDistributed(Flatten()))
-
-model.add(LSTM(64, return_sequences=True))
-model.add(Dropout(0.2))
 model.add(LSTM(32))
 model.add(Dropout(0.2))
 
-model.add(Dense(units=64, activation='relu'))
-model.add(BatchNormalization())
+model.add(Dense(units=32, activation='relu'))
 model.add(Dropout(0.2))
 
 model.add(Dense(units=8, activation='softmax'))
 
-from tensorflow.keras.optimizers import Adam
-
-adam = Adam(lr=0.001)
-model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
 from tensorflow.keras.utils import plot_model
 
 plot_model(model, to_file='model.png', show_shapes=True)
 
 model.summary()
-
 
 
 from keras.optimizers import adam_v2
@@ -365,13 +354,13 @@ model.compile(optimizer=optimizer,
 
 rlrp = ReduceLROnPlateau(monitor='val_loss', factor=0.5, verbose=1, patience=4, min_lr=0.0000001)
 
-epochs = 40
+epochs = 100
 history = model.fit(x_train, y_train, batch_size=128, epochs=epochs, validation_data=(x_test, y_test), callbacks=[rlrp])
 
 
 print("Accuracy of our model on test data : " , model.evaluate(x_test,y_test)[1]*100 , "%")
 
-epochs = [i for i in range(40)]
+epochs = [i for i in range(100)]
 fig , ax = plt.subplots(1,2)
 train_acc = history.history['accuracy']
 train_loss = history.history['loss']
