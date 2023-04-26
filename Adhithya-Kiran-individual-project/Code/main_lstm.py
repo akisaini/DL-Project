@@ -47,12 +47,11 @@ if not sys.warnoptions:
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 cwd = os.getcwd()
-
 Ravdess = cwd + os.path.sep + 'ravdess' + os.path.sep
 
 if not os.path.exists(Ravdess):
     os.chdir("..")  # Change to the parent directory
-    Ravdess = cwd + os.path.sep + 'ravdess' + os.path.sep
+    Ravdess = os.getcwd() + os.path.sep + 'ravdess' + os.path.sep
 
 print("Ravdess 1st",Ravdess)
 ravdess_directory_list = os.listdir(Ravdess)
@@ -354,10 +353,6 @@ from tensorflow.keras.optimizers import Adam
 
 adam = Adam(lr=0.001)
 model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
-
-from tensorflow.keras.utils import plot_model
-
-plot_model(model, to_file='model.png', show_shapes=True)
 
 model.summary()
 
