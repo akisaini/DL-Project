@@ -66,9 +66,11 @@ act_gender = []
 main_path = []
 origin = []
 
-os.getcwd()
-os.chdir("..") # Change to the parent directory
+
 rootdir = os.getcwd() + os.path.sep + 'ravdess'
+if not os.path.exists(rootdir):
+    os.chdir("..")  # Change to the parent directory
+    rootdir = os.getcwd() + os.path.sep + 'ravdess'
 # print(rootdir)
 
 # getting gender, emotion, actor(M/F)
@@ -163,7 +165,7 @@ for i in range(len(pd_audio)):
     # temporally average spectrogram
     log_spectrogram.append(np.mean(db_spec, axis=0))
     if i % 100 == 0:
-        print('do preprossing', i//100)
+        print('do preprossing', i, 'total', len(pd_audio))
 
 max_row_length = max([len(row) for row in log_spectrogram])
 
