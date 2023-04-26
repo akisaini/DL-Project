@@ -167,7 +167,6 @@ for i in range(len(pd_audio)):
 
 max_row_length = max([len(row) for row in log_spectrogram])
 
-# padding
 padded_list_of_lists = []
 for row in log_spectrogram:
     padding_length = max_row_length - len(row)
